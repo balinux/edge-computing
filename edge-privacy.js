@@ -1,7 +1,9 @@
-// edge-device.js
+// edge-privacy.js
 // Memerlukan Node.js versi 18+ (karena menggunakan native fetch)
-const fs = require('fs');
-const crypto = require('crypto');
+import fs from 'fs';
+import crypto from 'crypto';
+import { serve } from '@hono/node-server';
+import { Hono } from 'hono';
 
 // ==============================================================
 // 1. RUNTIME ADAPTATION ENGINE (RAE)
@@ -52,15 +54,7 @@ async function kirimKeCloud(endpoint, data) {
 }
 
 // Simulasi siklus utama (Main Loop)
-async function jalankanSistemPemantauan() {
-    // local
-    // const bateraiPerangkat = 15;    // Persentase sisa baterai
-    // const latensiJaringan = 50;     // Latensi dalam milidetik (ms)
-
-    // cloud
-    const bateraiPerangkat = 50;    // Persentase sisa baterai
-    const latensiJaringan = 150;     // Latensi dalam milidetik (ms)
-
+async function jalankanSistemPemantauan(bateraiPerangkat = 50, latensiJaringan = 150) {
     // Simulasi data mentah dari sensor di kebun (termasuk data sensitif)
     const dataSensor = {
         suhu: 32.5,
@@ -122,5 +116,34 @@ async function jalankanSistemPemantauan() {
     }
 }
 
-// Jalankan sistem
-jalankanSistemPemantauan();
+const app = new Hono();
+
+// Endpoint untuk menerima data kondisi dari HTTP request
+app.post('/trigger', async (c) => {
+    try {
+        const body = await c.req.json();
+        const baterai = body.baterai !== undefined ? body.baterai : 50;
+        const latensi = body.latensi !== undefined ? body.latensi : 150;
+
+        console.log(`\n[API] Menerima request trigger: Baterai ${baterai}%, Latensi ${latensi}ms`);
+        
+        // Menjalankan sistem pemantauan dengan data dari HTTP request
+        await jalankanSistemPemantauan(baterai, latensi);
+        
+        return c.json({
+            status: 'success',
+            message: 'Sistem pemantauan privasi telah dijalankan berdasarkan input request',
+            data: { baterai, latensi }
+        });
+    } catch (error) {
+        return c.json({ status: 'error', message: error.message }, 400);
+    }
+});
+
+const port = 4001;
+console.log(`🚀 Server Edge Privacy berjalan di http://localhost:${port}`);
+
+serve({
+    fetch: app.fetch,
+    port: port
+});

@@ -1,5 +1,7 @@
 // edge-device.js
 // Memerlukan Node.js versi 18+ (karena menggunakan native fetch)
+import { serve } from '@hono/node-server';
+import { Hono } from 'hono';
 
 // 1. Runtime Adaptation Engine (RAE)
 // Mengambil keputusan di mana komputasi harus dijalankan
@@ -29,15 +31,8 @@ async function kirimKeCloud(endpoint, data) {
 }
 
 // Simulasi siklus utama (Main Loop)
-async function jalankanSistemPemantauan() {
+async function jalankanSistemPemantauan(bateraiPerangkat = 50, latensiJaringan = 50) {
   // Simulasi pembacaan sensor dan kondisi mini-PC / Edge device
-  // 1. Simulasi kirim ke cloud
-  const bateraiPerangkat = 50; // Persentase sisa baterai
-  const latensiJaringan = 50; // Latensi dalam milidetik (ms)
-
-  // 2. Simulasi tes di lokal
-  // const bateraiPerangkat = 15;    // Persentase sisa baterai
-  // const latensiJaringan = 250;     // Latensi dalam milidetik (ms)
 
   // Simulasi data mentah dari sensor di kebun
   const dataSensor = {
@@ -77,5 +72,34 @@ async function jalankanSistemPemantauan() {
   }
 }
 
-// Jalankan sistem
-jalankanSistemPemantauan();
+const app = new Hono();
+
+// Endpoint untuk menerima data kondisi dari HTTP request
+app.post('/trigger', async (c) => {
+  try {
+    const body = await c.req.json();
+    const baterai = body.baterai !== undefined ? body.baterai : 50;
+    const latensi = body.latensi !== undefined ? body.latensi : 50;
+
+    console.log(`\n[API] Menerima request trigger: Baterai ${baterai}%, Latensi ${latensi}ms`);
+    
+    // Menjalankan sistem pemantauan dengan data dari HTTP request
+    await jalankanSistemPemantauan(baterai, latensi);
+    
+    return c.json({
+      status: 'success',
+      message: 'Sistem pemantauan telah dijalankan berdasarkan input request',
+      data: { baterai, latensi }
+    });
+  } catch (error) {
+    return c.json({ status: 'error', message: error.message }, 400);
+  }
+});
+
+const port = 4000;
+console.log(`🚀 Server Edge Device berjalan di http://localhost:${port}`);
+
+serve({
+  fetch: app.fetch,
+  port: port
+});
