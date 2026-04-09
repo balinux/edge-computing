@@ -9,10 +9,19 @@ import { Hono } from 'hono';
 // 1. RUNTIME ADAPTATION ENGINE (RAE)
 // ==============================================================
 function evaluasiRAE(baterai, latensiJaringan) {
-    if (baterai < 20 || latensiJaringan > 200) {
+    // 1. Prioritas Utama: Jika jaringan buruk/putus, WAJIB eksekusi di lokal.
+    if (latensiJaringan > 200) {
         return "LOKAL";
     }
-    return "CLOUD";
+    
+    // 2. Jika jaringan bagus, tapi baterai sangat kritis (< 20%).
+    // Offload tugas ke Cloud untuk menghemat sisa baterai dari beban CPU lokal.
+    if (baterai < 20) {
+        return "CLOUD";
+    }
+
+    // 3. Default: Proses di LOKAL untuk menghemat bandwidth
+    return "LOKAL";
 }
 
 // ==============================================================
@@ -93,7 +102,7 @@ async function jalankanSistemPemantauan(bateraiPerangkat = 50, latensiJaringan =
     const keputusanEksekusi = evaluasiRAE(bateraiPerangkat, latensiJaringan);
 
     if (keputusanEksekusi === "LOKAL") {
-        console.log("⚙️ [RAE] Baterai lemah/Jaringan lambat. Mengeksekusi analisis secara LOKAL...");
+        console.log("⚙️ [RAE] Mengeksekusi analisis secara LOKAL (Jaringan buruk atau default hemat bandwidth)...");
 
         const hasilAnalisisLokal = "Bercak kuning terdeteksi pada daun (Kekurangan Nitrogen)";
 
@@ -109,7 +118,7 @@ async function jalankanSistemPemantauan(bateraiPerangkat = 50, latensiJaringan =
         await kirimKeCloud("http://localhost:3000/log-abstraksi", dataAbstraksi);
 
     } else {
-        console.log("🚀 [RAE] Kondisi optimal. Mengirim data ke CLOUD untuk analisis mendalam...");
+        console.log("🚀 [RAE] Mengirim data ke CLOUD (Baterai lemah untuk proses lokal atau butuh komputasi mendalam)...");
 
         // Objek dataSensor di sini sudah bersih dari data sensitif (RFID sudah dihapus, lokasi sudah disamarkan)
         await kirimKeCloud("http://localhost:3000/analisis-gambar", dataSensor);

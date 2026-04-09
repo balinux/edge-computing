@@ -6,13 +6,22 @@ import { Hono } from 'hono';
 // 1. Runtime Adaptation Engine (RAE)
 // Mengambil keputusan di mana komputasi harus dijalankan
 function evaluasiRAE(baterai, latensiJaringan) {
-  console.log(baterai);
-  console.log(latensiJaringan);
-  // Jika baterai di bawah 20% atau latensi jaringan lambat (> 200ms)
-  if (baterai < 20 || latensiJaringan > 200) {
+  console.log("Baterai:", baterai, "%, Latensi:", latensiJaringan, "ms");
+  
+  // 1. Prioritas Utama: Jika jaringan buruk/putus, WAJIB eksekusi di lokal.
+  if (latensiJaringan > 200) {
     return "LOKAL";
   }
-  return "CLOUD";
+  
+  // 2. Jika jaringan bagus, tapi baterai sangat kritis (< 20%).
+  // Offload (lempar) tugas berat ke Cloud untuk menghemat pemakaian CPU lokal (menghemat sisa baterai).
+  if (baterai < 20) {
+    return "CLOUD";
+  }
+
+  // 3. Default (Kondisi Optimal): Proses di LOKAL untuk menghemat bandwidth
+  // dan mempraktikkan Edge-first architecture (kecuali butuh model sangat besar di Cloud).
+  return "LOKAL";
 }
 
 // Fungsi bantuan untuk mengirim data ke Cloud
@@ -46,7 +55,7 @@ async function jalankanSistemPemantauan(bateraiPerangkat = 50, latensiJaringan =
 
   if (keputusanEksekusi === "LOKAL") {
     console.log(
-      "[RAE] Baterai lemah/Jaringan lambat. Mengeksekusi analisis secara LOKAL...",
+      "[RAE] Mengeksekusi analisis secara LOKAL (Kondisi jaringan buruk atau default hemat bandwidth)...",
     );
 
     // Simulasi proses analisis lokal menggunakan model TensorFlow.js yang ringan
@@ -64,7 +73,7 @@ async function jalankanSistemPemantauan(bateraiPerangkat = 50, latensiJaringan =
     await kirimKeCloud("http://localhost:3000/log-abstraksi", dataAbstraksi);
   } else {
     console.log(
-      "[RAE] Kondisi optimal. Mengirim data mentah ke CLOUD untuk analisis mendalam...",
+      "[RAE] Mengirim tugas berat ke CLOUD (Baterai lemah untuk CPU lokal, atau butuh resource besar)...",
     );
 
     // Mengirim data sensor beserta gambar lengkap untuk diproses oleh Cloud
